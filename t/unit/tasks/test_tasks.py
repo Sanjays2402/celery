@@ -620,6 +620,30 @@ class test_task_retries(TasksCase):
         self.autoretry_task.apply((1, 0))
         assert self.autoretry_task.iterations == 6
 
+    def test_autoretry_does_not_mutate_retry_kwargs(self):
+        @self.app.task(bind=True, shared=False,
+                       autoretry_for=(ZeroDivisionError,),
+                       retry_backoff=True, retry_jitter=False)
+        def task(self_, x, y):
+            return x / y
+
+        retry_kwargs = next(
+            cell.cell_contents for cell in task.run.__closure__
+            if isinstance(cell.cell_contents, dict)
+        )
+
+        with patch.object(task, 'retry', side_effect=Retry):
+            for retries in range(3):
+                task.push_request(retries=retries)
+                try:
+                    task.run(1, 0)
+                except Retry:
+                    pass
+                finally:
+                    task.pop_request()
+
+        assert retry_kwargs == {}
+
     def test_autoretry_arith(self):
         self.autoretry_arith_task.max_retries = 3
         self.autoretry_arith_task.iterations = 0

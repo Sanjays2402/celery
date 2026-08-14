@@ -15,7 +15,7 @@ def add_autoretry_behaviour(task, **options):
         options.get('dont_autoretry_for',
                     getattr(task, 'dont_autoretry_for', ()))
     )
-    retry_kwargs = options.get(
+    retry_kwargs_template = options.get(
         'retry_kwargs', getattr(task, 'retry_kwargs', {})
     )
     retry_backoff = float(
@@ -45,6 +45,7 @@ def add_autoretry_behaviour(task, **options):
             except dont_autoretry_for:
                 raise
             except autoretry_for as exc:
+                retry_kwargs = retry_kwargs_template.copy()
                 if retry_backoff:
                     retry_kwargs['countdown'] = \
                         get_exponential_backoff_interval(
